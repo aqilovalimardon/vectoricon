@@ -6946,7 +6946,8 @@
       if (!iconObj) return "";
       const styleMode = options.styleMode || state.iconStyle; // "outline" or "full"
       const size = options.size || state.vectorSize;
-      const strokeWidth = options.strokeWidth || state.strokeWidth;
+      const rawStrokePt = options.strokeWidth || state.strokeWidth;
+      const strokeWidth = options.exactPt ? Math.max(0.05, Number((rawStrokePt * (24 / size)).toFixed(3))) : rawStrokePt;
       const primaryColor = options.strokeColor || state.strokeColor;
       const cutoutColor = options.cutoutColor || "#ffffff";
       const cap = options.strokeCap || state.strokeCap;
@@ -7209,6 +7210,11 @@
           await navigator.clipboard.writeText(svgMarkup);
           copied = true;
         } catch (err) {}
+      }
+
+      if (!copied) {
+        showToast("Copy blocked by browser", "Please use Download .SVG instead.");
+        return;
       }
 
       const modeTag = styleLabel || (state.iconStyle === "full" ? "2. Full" : "1. Outline");
