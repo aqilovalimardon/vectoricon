@@ -8774,13 +8774,21 @@
                   const pending = fbState.pendingMyLibAction;
                   fbState.pendingMyLibAction = null;
                   if (pending === "open") {
-                    state.activeCategory = "mylibrary";
-                    updateCategoryTabStyles();
-                    filterIcons();
+                    if (state.myLibrary.size > 0) {
+                      state.activeCategory = "mylibrary";
+                      updateCategoryTabStyles();
+                      filterIcons();
+                    } else {
+                      state.activeCategory = "all";
+                      updateCategoryTabStyles();
+                      filterIcons();
+                      showToast("Welcome to My Library!", "Select any icon and click 'Save to My Library' to add it.");
+                    }
                   } else if (pending.startsWith("save:")) {
                     const iconName = pending.slice(5);
                     state.myLibrary.add(iconName);
                     window.__syncMyLibraryToCloud();
+                    showToast("Saved to My Library", iconName);
                     needRender = true;
                   }
                 }
@@ -8833,6 +8841,10 @@
             showAuthError("");
             authModal.classList.remove("hidden");
             ensureFirebaseLoaded().catch(() => {});
+            return;
+          }
+          if (state.activeCategory !== "mylibrary" && state.myLibrary.size === 0) {
+            showToast("My Library is empty", "Select any icon and click 'Save to My Library' on the right.");
             return;
           }
           state.activeCategory = state.activeCategory === "mylibrary" ? "all" : "mylibrary";
