@@ -4217,16 +4217,28 @@
         const allowed = new Set(["path", "circle", "rect", "polygon", "polyline", "line", "ellipse"]);
         const nodes = [];
         svgEl.querySelectorAll("path,circle,rect,polygon,polyline,line,ellipse").forEach(el => {
+          if (el.closest("defs,clipPath,mask")) return;
+          if (el.getAttribute("display") === "none") return;
           const tag = el.tagName.toLowerCase();
           if (!allowed.has(tag)) return;
+
+          const rawFill = (el.getAttribute("fill") || "").trim().toLowerCase();
+          const rawStroke = (el.getAttribute("stroke") || "").trim().toLowerCase();
+          // Agar element umuman bo'yalmagan va chizig'i ham bo'lmasa (bo'sh ramka), o'tkazib yuboramiz
+          if (rawFill === "none" && (!rawStroke || rawStroke === "none")) return;
+
           const attrs = {};
           for (const a of Array.from(el.attributes)) {
-            if (["id", "class", "style", "fill", "stroke", "stroke-width", "stroke-linecap", "stroke-linejoin", "fill-rule"].includes(a.name)) continue;
+            if (["id", "class", "style", "fill", "stroke", "stroke-width", "stroke-linecap", "stroke-linejoin", "fill-rule", "display"].includes(a.name)) continue;
             if (a.value !== undefined && a.value !== null) {
               attrs[a.name] = String(a.value);
             }
           }
-          if (mode === "full") attrs.role = "fill";
+
+          if (mode === "full") {
+            const isWhiteCutout = (rawFill === "#fff" || rawFill === "#ffffff" || rawFill === "white" || rawFill === "rgb(255,255,255)");
+            attrs.role = isWhiteCutout ? "cutout" : "fill";
+          }
           nodes.push([tag, attrs]);
         });
         return nodes.length ? nodes : null;
