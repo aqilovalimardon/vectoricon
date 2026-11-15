@@ -4514,6 +4514,57 @@
       if (localStorage.getItem("vectoricon_was_signed_in") === "1") {
         setTimeout(() => ensureFirebaseLoaded().catch(() => {}), 400);
       }
+      // === ADOBE ILLUSTRATOR CEP PLUGIN BRIDGE ===
+      if (window.self !== window.top) {
+        // 1. Saytda biror ikonka bosilganda -> Illustrator artboard'ga yuborish
+        const iconsGridEl = document.getElementById("iconsGrid");
+        if (iconsGridEl) {
+          iconsGridEl.addEventListener("click", (e) => {
+            const card = e.target.closest(".icon-card");
+            if (!card) return;
+            // Kichik kechikish: sayt o'zi state.selectedIcon ni yangilab olsin
+            setTimeout(() => {
+              if (!state.selectedIcon) return;
+              const cleanSvg = buildIllustratorSvg(state.selectedIcon, {
+                styleMode: state.iconStyle,
+                size: 24,
+                strokeWidth: state.strokeWidth,
+                strokeColor: "#000000",
+                strokeCap: state.strokeCap
+              });
+              window.parent.postMessage({
+                type: "INSERT_ICON_SVG",
+                name: state.selectedIcon.name,
+                styleMode: state.iconStyle,
+                svg: cleanSvg
+              }, "*");
+            }, 30);
+          });
+        }
+
+        // 2. Illustrator "Save to Site" bosilganda -> 24x24 SVG ni Firebase'ga yozish
+        window.addEventListener("message", async (event) => {
+          const data = event.data;
+          if (!data || data.type !== "SAVE_ICON_OVERRIDE_FROM_CEP") return;
+          const targetName = data.name || (state.selectedIcon && state.selectedIcon.name);
+          if (!targetName) {
+            window.parent.postMessage({ type: "OVERRIDE_SAVED_ERR", message: "Ikonka nomi topilmadi!" }, "*");
+            return;
+          }
+          try {
+            if (typeof window.__saveIconOverride === "function") {
+              const ok = await window.__saveIconOverride(targetName, data.svg, data.styleMode);
+              if (ok) {
+                window.parent.postMessage({ type: "OVERRIDE_SAVED_OK", name: targetName }, "*");
+              } else {
+                window.parent.postMessage({ type: "OVERRIDE_SAVED_ERR", message: "Admin Sign-In qiling!" }, "*");
+              }
+            }
+          } catch (err) {
+            window.parent.postMessage({ type: "OVERRIDE_SAVED_ERR", message: err.message || "Saqlashda xato" }, "*");
+          }
+        });
+      }
     });
   </script>
 
