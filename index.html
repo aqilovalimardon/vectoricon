@@ -633,8 +633,8 @@
   <g id="teacher-chalkboard-full">
     <path d="M 7.83 14.74 L 12.33 10.74 A 1.01 1.01 0 0 1 13.67 12.26 L 9.17 16.26 A 1.01 1.01 0 0 1 7.83 14.74 Z" fill="#f8fafc" fill-rule="nonzero"></path>
     <path d="M 10.5 2.25 H 20.5 A 2.25 2.25 0 0 1 22.75 4.5 V 11.5 A 2.25 2.25 0 0 1 20.5 13.75 H 10.5 A 2.25 2.25 0 0 1 8.25 11.5 V 4.5 A 2.25 2.25 0 0 1 10.5 2.25 Z M 12 5.75 L 19 5.75 A 0.75 0.75 0 0 1 19 7.25 L 12 7.25 A 0.75 0.75 0 0 1 12 5.75 Z M 12 8.75 L 16.5 8.75 A 0.75 0.75 0 0 1 16.5 10.25 L 12 10.25 A 0.75 0.75 0 0 1 12 8.75 Z" fill="#f8fafc" fill-rule="evenodd"></path>
-    <path d="M 2 20.75 A 0.75 0.75 0 0 1 1.25 20 L 1.25 17.14 A 4.05 4.05 0 0 1 4.64 13.75 L 6.36 13.75 A 4.05 4.05 0 0 1 9.75 17.14 L 9.75 20 A 0.75 0.75 0 0 1 9 20.75 Z" fill="#f8fafc" fill-rule="evenodd"></path>
-    <path d="M 2.25 9.5 A 3.25 3.25 0 1 0 8.75 9.5 A 3.25 3.25 0 1 0 2.25 9.5 Z" fill="#f8fafc" fill-rule="evenodd"></path>
+    <path d="M 2 20.75 C 1.59 20.75, 1.25 20.41, 1.25 20 L 1.26 17.57 C 1.36 17.25, 1.58 16.16, 1.88 15.64 C 2.17 15.12, 2.58 14.76, 3.03 14.46 C 3.48 14.16, 4.06 13.94, 4.59 13.83 C 5.12 13.72, 5.7 13.7, 6.23 13.79 C 6.76 13.88, 7.32 14.06, 7.78 14.34 C 8.24 14.62, 8.7 15.04, 9.01 15.49 C 9.32 15.94, 9.54 16.74, 9.66 17.04 C 9.78 17.34, 9.7 17.27, 9.71 17.31 L 9.68 20.01 C 9.68 20.42, 9.34 20.75, 8.93 20.75 L 2 20.75 Z" fill="#f8fafc" fill-rule="evenodd"></path>
+    <path d="M 5.5 6.25 C 7.29 6.25, 8.75 7.71, 8.75 9.5 C 8.75 11.29, 7.29 12.75, 5.5 12.75 C 3.71 12.75, 2.25 11.29, 2.25 9.5 C 2.25 7.71, 3.71 6.25, 5.5 6.25 Z" fill="#f8fafc" fill-rule="evenodd"></path>
   </g>
 </svg></div>
           <button id="copyFullDirectBtn" type="button" class="hidden">Copy 2. Full</button>
@@ -1402,8 +1402,8 @@
       if (fs === 1 && dAngle < 0) dAngle += 2 * Math.PI;
       const cosHalf = Math.cos(dAngle / 2);
       const r = (rx + ry) / 2;
-      // Only decompile true corner fillets (turn < 155 deg); keep 180-degree domes/U-turns for curve sampler
-      if (Math.abs(cosHalf) < 0.22 || Math.abs(dAngle) > Math.PI * 0.86) return null;
+      // Only decompile small corner fillets (r <= 2.25 and ~90 deg); keep larger arcs (book-open a4/a3, domes, arches) for smooth curve engine!
+      if (r > 2.25 || Math.abs(cosHalf) < 0.35 || Math.abs(dAngle) > Math.PI * 0.62) return null;
       const midA = a1 + dAngle / 2;
       const distV = r / cosHalf;
       return {
@@ -1474,6 +1474,7 @@
           const fs = Number(tokens[i++]);
           const nx = cmd === "a" ? cx + Number(tokens[i++]) : Number(tokens[i++]);
           const ny = cmd === "a" ? cy + Number(tokens[i++]) : Number(tokens[i++]);
+          if (Math.abs(rx - ry) > 0.25 || rx > 2.25) return null;
           const info = svgArcFilletToApex(cx, cy, rx, ry, rot, fa, fs, nx, ny);
           if (!info) return null; // large/complex arc -> use smooth curve sampler
           if (curr.length > 0 && Math.hypot(curr[curr.length - 1][0] - cx, curr[curr.length - 1][1] - cy) < 0.06) {
@@ -1730,10 +1731,18 @@
       for (const [tag, attrs] of nodes) {
         if (tag === "circle") {
           const cx = Number(attrs.cx || 0), cy = Number(attrs.cy || 0), r = Number(attrs.r || 0);
+          const k = 0.55228475;
+          const bezCircle = (rad, ccw) => {
+            const c = rad * k;
+            if (!ccw) {
+              return `M ${fmtNum(cx)} ${fmtNum(cy - rad)} C ${fmtNum(cx + c)} ${fmtNum(cy - rad)}, ${fmtNum(cx + rad)} ${fmtNum(cy - c)}, ${fmtNum(cx + rad)} ${fmtNum(cy)} C ${fmtNum(cx + rad)} ${fmtNum(cy + c)}, ${fmtNum(cx + c)} ${fmtNum(cy + rad)}, ${fmtNum(cx)} ${fmtNum(cy + rad)} C ${fmtNum(cx - c)} ${fmtNum(cy + rad)}, ${fmtNum(cx - rad)} ${fmtNum(cy + c)}, ${fmtNum(cx - rad)} ${fmtNum(cy)} C ${fmtNum(cx - rad)} ${fmtNum(cy - c)}, ${fmtNum(cx - c)} ${fmtNum(cy - rad)}, ${fmtNum(cx)} ${fmtNum(cy - rad)} Z`;
+            }
+            return `M ${fmtNum(cx)} ${fmtNum(cy - rad)} C ${fmtNum(cx - c)} ${fmtNum(cy - rad)}, ${fmtNum(cx - rad)} ${fmtNum(cy - c)}, ${fmtNum(cx - rad)} ${fmtNum(cy)} C ${fmtNum(cx - rad)} ${fmtNum(cy + c)}, ${fmtNum(cx - c)} ${fmtNum(cy + rad)}, ${fmtNum(cx)} ${fmtNum(cy + rad)} C ${fmtNum(cx + c)} ${fmtNum(cy + rad)}, ${fmtNum(cx + rad)} ${fmtNum(cy + c)}, ${fmtNum(cx + rad)} ${fmtNum(cy)} C ${fmtNum(cx + rad)} ${fmtNum(cy - c)}, ${fmtNum(cx + c)} ${fmtNum(cy - rad)}, ${fmtNum(cx)} ${fmtNum(cy - rad)} Z`;
+          };
           const rOut = r + halfW, rIn = r - halfW;
-          let d = `M ${fmtNum(cx - rOut)} ${fmtNum(cy)} A ${fmtNum(rOut)} ${fmtNum(rOut)} 0 1 0 ${fmtNum(cx + rOut)} ${fmtNum(cy)} A ${fmtNum(rOut)} ${fmtNum(rOut)} 0 1 0 ${fmtNum(cx - rOut)} ${fmtNum(cy)} Z`;
+          let d = bezCircle(rOut, false);
           if (!outerOnly && rIn > 0.05) {
-            d += ` M ${fmtNum(cx - rIn)} ${fmtNum(cy)} A ${fmtNum(rIn)} ${fmtNum(rIn)} 0 1 1 ${fmtNum(cx + rIn)} ${fmtNum(cy)} A ${fmtNum(rIn)} ${fmtNum(rIn)} 0 1 1 ${fmtNum(cx - rIn)} ${fmtNum(cy)} Z`;
+            d += " " + bezCircle(rIn, true);
           }
           outPaths.push(`  <path d="${d}" fill="${color}" fill-rule="nonzero" />`);
           continue;
@@ -1829,11 +1838,36 @@
 
             for (const sp of subpaths) {
               const closed = outerOnly || (sp.length > 3 && Math.hypot(sp[0][0] - sp[sp.length - 1][0], sp[0][1] - sp[sp.length - 1][1]) < 0.25);
-              const simp = simplifyPolylineRDP(sp, 0.05).map(p => [p[0], p[1], 0]);
+              const simp = simplifyPolylineRDP(sp, 0.09).map(p => [p[0], p[1], 0]);
               const ptsToExp = closed ? simp : _extendEndsIfNearBBox(simp, extendBBox, strokeWidth);
               const rawD = expandPolygonOrPolyline(ptsToExp, closed);
               if (rawD) {
-                outPaths.push(`  <path d="${rawD}" fill="${color}" fill-rule="nonzero" />`);
+                // Convert expanded polygon rings into smooth minimalist Bezier curves (C) & straight lines (L)
+                const subRings = rawD.split(/(?=[Mm])/).map(s => s.trim()).filter(Boolean).map(sd => {
+                  const toks = sd.match(/[a-zA-Z]|[-+]?(?:\d+\.?\d*|\.\d+)/g) || [];
+                  const ring = [];
+                  let cmd = "", k = 0;
+                  while (k < toks.length) {
+                    if (/^[a-zA-Z]$/.test(toks[k])) { cmd = toks[k++]; continue; }
+                    if (cmd === "M" || cmd === "L") {
+                      ring.push([Number(toks[k++]), Number(toks[k++])]);
+                    } else if (cmd === "A") {
+                      const rx = Number(toks[k++]), ry = Number(toks[k++]);
+                      k += 3; // skip rot, fa, fs
+                      const ex = Number(toks[k++]), ey = Number(toks[k++]);
+                      if (ring.length) {
+                        const prev = ring[ring.length - 1];
+                        ring.push([(prev[0] + ex) / 2, (prev[1] + ey) / 2]);
+                      }
+                      ring.push([ex, ey]);
+                    } else {
+                      k++;
+                    }
+                  }
+                  return ring;
+                }).filter(r => r.length >= 3);
+                const smoothD = subRings.length ? subRings.map(r => _smoothRingToSvgD(r)).filter(Boolean).join(" ") : rawD;
+                outPaths.push(`  <path d="${smoothD || rawD}" fill="${color}" fill-rule="nonzero" />`);
               }
             }
           }
@@ -2049,7 +2083,7 @@
         const l1 = Math.hypot(v1x, v1y) || 1;
         const l2 = Math.hypot(v2x, v2y) || 1;
         const cosA = (v1x * v2x + v1y * v2y) / (l1 * l2);
-        if (cosA < 0.78 || l1 > 1.8 || l2 > 1.8) {
+        if (cosA < 0.86 || l1 > 2.2 || l2 > 2.2) {
           isCorner[i] = true;
         }
       }
@@ -2111,7 +2145,7 @@
             let accLen = 0;
             for (let m = 1; m < run.length - 1; m++) {
               accLen += Math.hypot(run[m][0] - run[m - 1][0], run[m][1] - run[m - 1][1]);
-              if (accLen >= 0.45) {
+              if (accLen >= 1.05) {
                 decimated.push(run[m]);
                 accLen = 0;
               }
