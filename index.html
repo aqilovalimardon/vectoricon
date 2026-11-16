@@ -633,7 +633,7 @@
   <g id="teacher-chalkboard-full">
     <path d="M 7.83 14.74 L 12.33 10.74 A 1.01 1.01 0 0 1 13.67 12.26 L 9.17 16.26 A 1.01 1.01 0 0 1 7.83 14.74 Z" fill="#f8fafc" fill-rule="nonzero"></path>
     <path d="M 10.5 2.25 H 20.5 A 2.25 2.25 0 0 1 22.75 4.5 V 11.5 A 2.25 2.25 0 0 1 20.5 13.75 H 10.5 A 2.25 2.25 0 0 1 8.25 11.5 V 4.5 A 2.25 2.25 0 0 1 10.5 2.25 Z M 12 5.75 L 19 5.75 A 0.75 0.75 0 0 1 19 7.25 L 12 7.25 A 0.75 0.75 0 0 1 12 5.75 Z M 12 8.75 L 16.5 8.75 A 0.75 0.75 0 0 1 16.5 10.25 L 12 10.25 A 0.75 0.75 0 0 1 12 8.75 Z" fill="#f8fafc" fill-rule="evenodd"></path>
-    <path d="M 2 20.75 L 1.38 20.59 L 1.25 19.97 L 1.38 16.86 L 1.09 16.64 L 1.45 16.58 L 1.88 15.64 L 1.69 15.33 L 2.04 15.42 L 3.03 14.46 L 2.99 14.09 L 3.3 14.3 L 4.59 13.83 L 4.66 13.47 L 4.85 13.78 L 6.23 13.79 L 6.43 13.48 L 6.5 13.84 L 7.78 14.34 L 8.09 14.14 L 8.04 14.51 L 9.01 15.49 L 9.38 15.44 L 9.18 15.75 L 9.66 17.04 L 10.02 17.11 L 9.71 17.31 L 9.68 20.01 L 9.54 20.62 L 8.93 20.75 L 2 20.75 Z" fill="#f8fafc" fill-rule="evenodd"></path>
+    <path d="M 1.22 20.75 C 1.25 20.08, 1.06 17.78, 1.38 16.71 C 1.7 15.65, 2.59 14.84, 3.15 14.35 C 3.7 13.86, 4.18 13.87, 4.72 13.78 C 5.25 13.69, 5.83 13.69, 6.37 13.79 C 6.91 13.9, 7.47 14.1, 7.93 14.4 C 8.39 14.7, 8.82 15.14, 9.12 15.6 C 9.42 16.06, 9.62 16.31, 9.71 17.17 C 9.81 18.03, 9.68 20.15, 9.67 20.75 L 1.22 20.75 Z" fill="#f8fafc" fill-rule="evenodd"></path>
     <path d="M 5.5 6.25 C 7.29 6.25, 8.75 7.71, 8.75 9.5 C 8.75 11.29, 7.29 12.75, 5.5 12.75 C 3.71 12.75, 2.25 11.29, 2.25 9.5 C 2.25 7.71, 3.71 6.25, 5.5 6.25 Z" fill="#f8fafc" fill-rule="evenodd"></path>
   </g>
 </svg></div>
@@ -1839,7 +1839,7 @@
             const _removeRingSelfBowties = (ring) => {
               if (!ring || ring.length < 6) return ring;
               let pts = ring.map(p => [p[0], p[1]]);
-              for (let pass = 0; pass < 3; pass++) {
+              for (let pass = 0; pass < 4; pass++) {
                 let changed = false;
                 const n = pts.length;
                 for (let i = 0; i < n && !changed; i++) {
@@ -1848,7 +1848,7 @@
                     if (i === 0 && j === n - 1) continue;
                     const c = pts[j], d = pts[(j + 1) % n];
                     const hit = _segIntersect2D(a, b, c, d);
-                    if (hit && hit.t > 0.02 && hit.t < 0.98 && hit.u > 0.02 && hit.u < 0.98) {
+                    if (hit && hit.t > 0.01 && hit.t < 0.99 && hit.u > 0.01 && hit.u < 0.99) {
                       const ix = a[0] + hit.t * (b[0] - a[0]);
                       const iy = a[1] + hit.t * (b[1] - a[1]);
                       const loopLen = j - i;
@@ -1866,41 +1866,92 @@
               }
               return pts;
             };
+
+            const _offsetSmoothCurveRing = (pts, closed, halfW, capMode) => {
+              if (!pts || pts.length < 2) return "";
+              const clean = [pts[0]];
+              for (let i = 1; i < pts.length; i++) {
+                if (Math.hypot(pts[i][0] - clean[clean.length - 1][0], pts[i][1] - clean[clean.length - 1][1]) > 0.04) {
+                  clean.push(pts[i]);
+                }
+              }
+              if (closed && clean.length > 2 && Math.hypot(clean[0][0] - clean[clean.length - 1][0], clean[0][1] - clean[clean.length - 1][1]) < 0.1) {
+                clean.pop();
+              }
+              const n = clean.length;
+              if (n < 2) return "";
+              if (closed && n >= 3) {
+                let area = 0;
+                for (let i = 0; i < n; i++) {
+                  const p1 = clean[i], p2 = clean[(i + 1) % n];
+                  area += p1[0] * p2[1] - p2[0] * p1[1];
+                }
+                if (area < 0) clean.reverse();
+              }
+
+              const segN = closed ? n : n - 1;
+              const segs = [];
+              for (let i = 0; i < segN; i++) {
+                const a = clean[i], b = clean[(i + 1) % n];
+                const dx = b[0] - a[0], dy = b[1] - a[1];
+                const len = Math.hypot(dx, dy) || 1;
+                const tx = dx / len, ty = dy / len;
+                segs.push({ tx, ty, nx: ty, ny: -tx });
+              }
+
+              const getOffsetPt = (idx, side) => {
+                const p = clean[idx];
+                if (!closed && (idx === 0 || idx === n - 1)) {
+                  const s = idx === 0 ? segs[0] : segs[segN - 1];
+                  return [p[0] + s.nx * halfW * side, p[1] + s.ny * halfW * side];
+                }
+                const s1 = segs[(idx - 1 + segN) % segN];
+                const s2 = segs[idx % segN];
+                const n1x = s1.nx * side, n1y = s1.ny * side;
+                const n2x = s2.nx * side, n2y = s2.ny * side;
+                let mx = n1x + n2x, my = n1y + n2y;
+                const mLen = Math.hypot(mx, my);
+                if (mLen < 1e-4) return [p[0] + n1x * halfW, p[1] + n1y * halfW];
+                mx /= mLen; my /= mLen;
+                const cosHalf = Math.max(0.45, mx * n1x + my * n1y);
+                const dist = Math.min(halfW * 1.85, halfW / cosHalf);
+                return [p[0] + mx * dist, p[1] + my * dist];
+              };
+
+              if (closed) {
+                const outer = _removeRingSelfBowties(clean.map((_, i) => getOffsetPt(i, +1)));
+                const outerD = _smoothRingToSvgD(outer);
+                if (outerOnly) return outerD;
+                const inner = _removeRingSelfBowties(clean.map((_, i) => getOffsetPt(i, -1)).reverse());
+                const innerD = _smoothRingToSvgD(inner);
+                return `${outerD} ${innerD}`.trim();
+              }
+
+              const sideA = [], sideB = [];
+              for (let i = 0; i < n; i++) sideA.push(getOffsetPt(i, +1));
+              for (let i = n - 1; i >= 0; i--) sideB.push(getOffsetPt(i, -1));
+
+              const sFirst = segs[0], sLast = segs[segN - 1];
+              const pStart = clean[0], pEnd = clean[n - 1];
+              if (capMode === "round") {
+                const eA = sideA[sideA.length - 1], eB = sideB[0];
+                const endTip = [pEnd[0] + sLast.tx * halfW, pEnd[1] + sLast.ty * halfW];
+                const sB = sideB[sideB.length - 1], sA = sideA[0];
+                const startTip = [pStart[0] - sFirst.tx * halfW, pStart[1] - sFirst.ty * halfW];
+                const ring = _removeRingSelfBowties([...sideA, endTip, ...sideB, startTip]);
+                return _smoothRingToSvgD(ring);
+              }
+              const ring = _removeRingSelfBowties([...sideA, ...sideB]);
+              return _smoothRingToSvgD(ring);
+            };
+
             for (const sp of subpaths) {
               const closed = outerOnly || (sp.length > 3 && Math.hypot(sp[0][0] - sp[sp.length - 1][0], sp[0][1] - sp[sp.length - 1][1]) < 0.25);
-              const simp = simplifyPolylineRDP(sp, 0.13).map(p => [p[0], p[1], 0]);
+              const simp = simplifyPolylineRDP(sp, 0.11);
               const ptsToExp = closed ? simp : _extendEndsIfNearBBox(simp, extendBBox, strokeWidth);
-              const rawD = expandPolygonOrPolyline(ptsToExp, closed);
-              if (rawD) {
-                const subRings = rawD.split(/(?=[Mm])/).map(s => s.trim()).filter(Boolean).map(sd => {
-                  const toks = sd.match(/[a-zA-Z]|[-+]?(?:\d+\.?\d*|\.\d+)/g) || [];
-                  const ring = [];
-                  let cmd = "", k = 0;
-                  while (k < toks.length) {
-                    if (/^[a-zA-Z]$/.test(toks[k])) { cmd = toks[k++]; continue; }
-                    if (cmd === "M" || cmd === "L") {
-                      ring.push([Number(toks[k++]), Number(toks[k++])]);
-                    } else if (cmd === "A") {
-                      const rx = Number(toks[k++]), ry = Number(toks[k++]);
-                      k += 3;
-                      const ex = Number(toks[k++]), ey = Number(toks[k++]);
-                      if (ring.length && rx > 0.05) {
-                        const prev = ring[ring.length - 1];
-                        const mx = (prev[0] + ex) / 2, my = (prev[1] + ey) / 2;
-                        const dx = ex - prev[0], dy = ey - prev[1];
-                        const len = Math.hypot(dx, dy) || 1;
-                        // bulge midpoint slightly outward for smooth round cap
-                        ring.push([mx + (dy / len) * (rx * 0.45), my - (dx / len) * (rx * 0.45)]);
-                      }
-                      ring.push([ex, ey]);
-                    } else {
-                      k++;
-                    }
-                  }
-                  return _removeRingSelfBowties(ring);
-                }).filter(r => r.length >= 3);
-                const smoothD = subRings.length ? subRings.map(r => _smoothRingToSvgD(r)).filter(Boolean).join(" ") : rawD;
-                outPaths.push(`  <path d="${smoothD || rawD}" fill="${color}" fill-rule="nonzero" />`);
+              const smoothD = _offsetSmoothCurveRing(ptsToExp, closed, halfW, cap);
+              if (smoothD) {
+                outPaths.push(`  <path d="${smoothD}" fill="${color}" fill-rule="nonzero" />`);
               }
             }
           }
@@ -2119,7 +2170,7 @@
         const l1 = Math.hypot(v1x, v1y) || 1;
         const l2 = Math.hypot(v2x, v2y) || 1;
         const cosA = (v1x * v2x + v1y * v2y) / (l1 * l2);
-        if (cosA < 0.86 || l1 > 2.2 || l2 > 2.2) {
+        if (cosA < 0.72) {
           isCorner[i] = true;
         }
       }
@@ -2181,7 +2232,7 @@
             let accLen = 0;
             for (let m = 1; m < run.length - 1; m++) {
               accLen += Math.hypot(run[m][0] - run[m - 1][0], run[m][1] - run[m - 1][1]);
-              if (accLen >= 1.05) {
+              if (accLen >= 1.35) {
                 decimated.push(run[m]);
                 accLen = 0;
               }
