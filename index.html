@@ -3210,6 +3210,15 @@
             state.selectedIcon = iconObj;
             updateInspector();
             renderGrid();
+            if (window.self !== window.top && window.parent) {
+              const cepSvg = buildIllustratorSvg(iconObj, { styleMode: state.iconStyle, size: 24, exactPt: false });
+              window.parent.postMessage({
+                type: "INSERT_ICON_SVG",
+                svg: cepSvg,
+                iconName: iconObj.name,
+                styleMode: state.iconStyle
+              }, "*");
+            }
           }
         }
       });
@@ -4259,11 +4268,15 @@
         }
       };
       function serializeNodesForFirestore(nodes) {
-        return (nodes || []).map(([tag, attrs]) => ({ tag, attrs: attrs || {} }));
+        return (nodes || []).map(([tag, attrs]) => ({ t: tag, a: attrs || {}, tag, attrs: attrs || {} }));
       }
       function deserializeNodesFromFirestore(raw) {
         if (!Array.isArray(raw)) return [];
-        return raw.map(item => Array.isArray(item) ? item : [item.tag || "path", item.attrs || {}]);
+        return raw.map(item => {
+          if (Array.isArray(item)) return item;
+          if (!item || typeof item !== "object") return ["path", {}];
+          return [item.t || item.tag || "path", item.a || item.attrs || {}];
+        });
       }
       function _scalePathDTo24(dStr, sx, sy, ox, oy) {
         const tokens = String(dStr || "").match(/[a-zA-Z]|[-+]?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?/gi);
@@ -4566,19 +4579,27 @@
       window.addEventListener("message", async (event) => {
         const msg = event && event.data;
         if (!msg || typeof msg !== "object") return;
-        if (msg.type === "VECTORICON_SAVE_OVERRIDE" && msg.iconName && msg.svg) {
+        if ((msg.type === "SAVE_ICON_OVERRIDE_FROM_CEP" || msg.type === "VECTORICON_SAVE_OVERRIDE") && (msg.svg || msg.svgText)) {
+          const targetName = msg.iconName || (state.selectedIcon && state.selectedIcon.name);
+          const targetMode = msg.styleMode || msg.mode || (state.iconStyle === "full" ? "full" : "outline");
+          const rawSvg = msg.svg || msg.svgText;
           let ok = false;
           let err = "";
-          try {
-            ok = await window.__saveIconOverride(msg.iconName, msg.svg, msg.mode);
-          } catch (e) {
-            err = String(e && e.message ? e.message : e);
+          if (targetName) {
+            try {
+              ok = await window.__saveIconOverride(targetName, rawSvg, targetMode);
+            } catch (e) {
+              err = String(e && e.message ? e.message : e);
+            }
+          } else {
+            err = "No icon selected";
           }
           if (event.source && typeof event.source.postMessage === "function") {
-            event.source.postMessage({ type: "VECTORICON_SAVE_RESULT", ok, iconName: msg.iconName, mode: msg.mode, error: err }, "*");
+            event.source.postMessage({ type: "SAVE_ICON_OVERRIDE_RESULT", ok, iconName: targetName, styleMode: targetMode, error: err }, "*");
+            event.source.postMessage({ type: "VECTORICON_SAVE_RESULT", ok, iconName: targetName, mode: targetMode, error: err }, "*");
           }
         } else if (msg.type === "VECTORICON_GET_SELECTED" && state.selectedIcon) {
-          const svg = buildIllustratorSvg(state.selectedIcon, { exactPt: true });
+          const svg = buildIllustratorSvg(state.selectedIcon, { size: 24, exactPt: false });
           if (event.source && typeof event.source.postMessage === "function") {
             event.source.postMessage({ type: "VECTORICON_SELECTED_SVG", name: state.selectedIcon.name, style: state.iconStyle, svg }, "*");
           }
