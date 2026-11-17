@@ -2695,7 +2695,7 @@
     function buildCardPreviewSvg(iconObj) {
       const gSize = state.gridIconSize || 44;
       const rawSvg = buildIllustratorSvg(iconObj, {
-        styleMode: state.iconStyle === "expand" ? "stroke" : state.iconStyle,
+        styleMode: (state.iconStyle === "expand" && !iconObj.isCustomExpand) ? "stroke" : state.iconStyle,
         size: gSize,
         strokeColor: "currentColor",
         cutoutColor: state.uiTheme === "light" ? "#ffffff" : "#0f172a",
@@ -4676,6 +4676,10 @@
             const normOut = normalizeNodesTo24(deserializeNodesFromFirestore(ov.outline));
             if (normOut.length) { ic.nodes = normOut; changed = true; }
           }
+          if (Array.isArray(ov.expand) && ov.expand.length) {
+            const normExp = normalizeNodesTo24(deserializeNodesFromFirestore(ov.expand));
+            if (normExp.length) { ic.expandNodes = normExp; ic.isCustomExpand = true; changed = true; }
+          }
           if (Array.isArray(ov.full) && ov.full.length) {
             const normFull = normalizeNodesTo24(deserializeNodesFromFirestore(ov.full));
             if (normFull.length) { ic.fullNodes = normFull; ic.isCustomFull = true; changed = true; }
@@ -4716,7 +4720,7 @@
           showToast("Admin sign-in required", "Sign in with your admin account to save icon overrides.");
           return false;
         }
-        const mode = targetMode || (state.iconStyle === "full" ? "full" : "outline");
+        const mode = targetMode || (state.iconStyle === "full" ? "full" : (state.iconStyle === "expand" ? "expand" : "outline"));
         const parsedNodes = parseSvgToVectorNodes(svgText, mode);
         if (!parsedNodes) {
           showToast("Invalid SVG", "Could not find vector shapes in clipboard SVG.");
@@ -4758,6 +4762,8 @@
         const ic = state.allIcons.find(i => i.name === iconName);
         if (ic) {
           if (ic.origNodes) ic.nodes = ic.origNodes;
+          ic.expandNodes = null;
+          ic.isCustomExpand = false;
           ic.fullNodes = ic.origFullNodes || null;
           ic.isCustomFull = false;
         }
